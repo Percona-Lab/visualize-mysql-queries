@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link href="./nv.d3.css" rel="stylesheet" type="text/css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.2/d3.min.js" charset="utf-8"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.0.1/spin.min.js'></script> 
+    <script src="./nv.d3.js"></script>
+
+    <style>
+        text {
+            font: 12px sans-serif;
+        }
+        svg {
+            display: block;
+        }
+        html, body, #mychart, svg {
+            margin: 0px;
+            padding: 0px;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<button id="update">Refresh Page</button>
+<!--
+choose server: <select id="mysql_server" onchange="load_all()">
+  <option value="1" selected="selected">test server (arubin blog)</option>
+  <option value="2">THIS server (sysbench test)</option>
+</select>
+-->
+group by: <select id="grp" onchange="load_all()">
+  <option value="1" selected="selected">statement</option>
+  <option value="2">table</option>
+  <option value="3">schema</option>
+  <option value="4">bad statements</option>
+
+</select>
+<div id="mychart" class='with-3d-shadow with-transitions'>
+    <svg></svg>
+</div>
+
+<script>
+    // register our custom symbols to nvd3
+    // make sure your path is valid given any size because size scales if the chart scales.
+    nv.utils.symbolMap.set('thin-x', function(size) {
+        size = Math.sqrt(size);
+        return 'M' + (-size/2) + ',' + (-size/2) +
+                'l' + size + ',' + size +
+                'm0,' + -(size) +
+                'l' + (-size) + ',' + size;
+    });
+   // create the chart
+   var chart;
+   load_all()
+
+   d3.select("#update").on("click", load_all);
+
+   function load_all() {
+	var target = document.getElementById("mychart");
+	// loader settings
+	var opts = {
+	  lines: 9, // The number of lines to draw
+	  length: 9, // The length of each line
+	  width: 5, // The line thickness
+	  radius: 14, // The radius of the inner circle
+	  color: '#EE3124', // #rgb or #rrggbb or array of colors
+	  speed: 1.9, // Rounds per second
+	  trail: 40, // Afterglow percentage
+	  className: 'spinner', // The CSS class to assign to the spinner
+	};
+	 var spinner = new Spinner(opts).spin(target);
+	
+//    	setTimeout(function() {
+		//var db = document.getElementById("mysql_server").value;
+		var grp = document.getElementById("grp").value;
+		var my_url="./q"+grp+".json"
+    		d3.json(my_url, function(e, d) {
+                        if (e) throw e;
+                        //console.log(JSON.stringify(d))
+			spinner.stop();
+			d3.selectAll("svg > *").remove();
+                        load_chart(d);
+    		});
+//    	}, 15000);
+    }
+
+  function load_chart(data) {
+    nv.addGraph(function() {
+        chart = nv.models.scatterChart()
+            .showDistX(true)
+            .showDistY(true)
+            .useVoronoi(true)
+            .color(d3.scale.category10().range())
+            //.duration(300)
+	    .xScale(d3.scale.log(10))
+            .yScale(d3.scale.log(10))  
+        ;
+	chart.pointRange([100, 10000])
+        chart.dispatch.on('renderEnd', function(){
+            console.log('render complete');
+        });
+        chart.xAxis
+	        .axisLabel('Number of executions (% of total)')
+		.tickFormat(d3.format(',d'));
+        chart.yAxis
+		.axisLabel('Average response time (milliseconds)')
+		.tickFormat(d3.format(',d'));
+        d3.select('#mychart svg')
+            //.datum(randomData(4,40))
+	    .datum(data)
+            .call(chart);
+        nv.utils.windowResize(chart.update);
+        chart.dispatch.on('stateChange', function(e) { ('New State:', JSON.stringify(e)); });
+	chart.tooltip.contentGenerator(function (d) { 
+		//console.log(JSON.stringify(d))	
+		//return JSON.stringify(d.point.digest_text) + JSON.stringify(d.point.size) 
+		return '<table>' + d.point.tooltip + '</table>' 
+	})
+
+        return chart;
+    });
+  }
+
+ 
+</script>
+</body>
+</html>
